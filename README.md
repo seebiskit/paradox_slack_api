@@ -2,7 +2,7 @@
 ## Get Started
 1. Create python venv `python -m venv .venv`
 2. Activate the venv `source .venv/bin/activate`
-3. Install pip packages `pip install requirements.txt`
+3. Install pip packages `pip install -r requirements.txt`
 4. Start the Flask API `python main.py`
 
 ## From ChatGPT on how to setup.
