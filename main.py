@@ -220,12 +220,14 @@ def handle_interactions():
         if category_id:
             # Get category details and show metrics modal
             category_data = get_category_with_metrics(category_id)
+            print(f"Category data: {category_data}", file=sys.stderr)
             if category_data:
                 metric_modal = build_metric_entry_modal(
                     category_id, 
                     category_data['name'], 
                     category_data['metrics']
                 )
+                print(f"Built metric modal for category: {category_data['name']}", file=sys.stderr)
                 
                 # Push new view
                 resp = requests.post(
@@ -241,6 +243,7 @@ def handle_interactions():
                 )
                 
                 print(f"views.push status: {resp.status_code}", file=sys.stderr)
+                print(f"views.push response: {resp.text}", file=sys.stderr)
                 return "", 200
         
         return jsonify({"response_action": "clear"})
