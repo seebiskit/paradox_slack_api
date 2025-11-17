@@ -501,6 +501,13 @@ def handle_interactions():
                     category_data['metrics']
                 )
                 
+                # Need to get channel ID - since we're in custom category flow, we need to trace it back
+                # For now, we'll have to send as DM since we can't easily get the original channel ID
+                metric_modal["private_metadata"] = json.dumps({
+                    "category_id": category_id,
+                    "channel_id": None  # Will fall back to DM
+                })
+                
                 return jsonify({
                     "response_action": "update",
                     "view": metric_modal
@@ -566,9 +573,24 @@ def handle_interactions():
          payload.get("view", {}).get("callback_id") == "log_metrics_modal":
 
         # Get metadata (category_id and channel_id)
-        metadata = json.loads(payload["view"]["private_metadata"])
-        category_id = metadata.get("category_id")
-        channel_id = metadata.get("channel_id")
+        try:
+            metadata_str = payload["view"]["private_metadata"]
+            if metadata_str:
+                metadata = json.loads(metadata_str)
+                category_id = metadata.get("category_id")
+                channel_id = metadata.get("channel_id")
+            else:
+                # Handle case where private_metadata is empty (custom category creation flow)
+                print("No metadata found, extracting from payload", file=sys.stderr)
+                category_id = None  # Will be determined from URL or other means
+                channel_id = None
+                metadata = {}
+        except json.JSONDecodeError:
+            print("Error parsing metadata JSON", file=sys.stderr)
+            category_id = None
+            channel_id = None
+            metadata = {}
+        
         print(f"Metric submission - Channel ID from metadata: {channel_id}", file=sys.stderr)
         print(f"Full metadata: {metadata}", file=sys.stderr)
         
