@@ -260,10 +260,23 @@ def handle_interactions():
             print("Creating category modal...", file=sys.stderr)
             create_modal = build_create_category_modal()
             print(f"Category modal created: {json.dumps(create_modal, indent=2)}", file=sys.stderr)
-            return jsonify({
-                "response_action": "push",
-                "view": create_modal
-            })
+            
+            # Use views.push API call instead of response_action
+            resp = requests.post(
+                "https://slack.com/api/views.push",
+                headers={
+                    "Authorization": f"Bearer {BOT_TOKEN}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "trigger_id": payload["trigger_id"],
+                    "view": create_modal
+                }
+            )
+            
+            print(f"views.push status: {resp.status_code}", file=sys.stderr)
+            print(f"views.push response: {resp.text}", file=sys.stderr)
+            return "", 200
 
     # Handle create category form submission
     if payload.get("type") == "view_submission" and \
