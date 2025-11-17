@@ -181,13 +181,16 @@ def build_metric_entry_modal(category_id: int, category_name: str, metric_defini
         "label": {"type": "plain_text", "text": "📝 Notes"}
     })
     
-    # Truncate category name to fit in 24 char limit (leaving room for "Log ")
-    short_name = category_name[:19] + "..." if len(category_name) > 19 else category_name
+    # Keep title under 25 characters
+    if len(category_name) > 20:
+        title = f"Log {category_name[:16]}..."
+    else:
+        title = f"Log {category_name}"
     
     return {
         "type": "modal",
         "callback_id": "log_metrics_modal",
-        "title": {"type": "plain_text", "text": f"Log {short_name}"},
+        "title": {"type": "plain_text", "text": title},
         "private_metadata": str(category_id),
         "blocks": blocks,
         "submit": {"type": "plain_text", "text": "Log All"}
