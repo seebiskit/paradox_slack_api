@@ -253,9 +253,13 @@ def handle_interactions():
 
     # Handle create category button click
     if payload.get("type") == "block_actions":
+        print(f"Block action received: {json.dumps(payload, indent=2)}", file=sys.stderr)
         action = payload["actions"][0]
+        print(f"Action ID: {action.get('action_id')}", file=sys.stderr)
         if action["action_id"] == "create_category_button":
+            print("Creating category modal...", file=sys.stderr)
             create_modal = build_create_category_modal()
+            print(f"Category modal created: {json.dumps(create_modal, indent=2)}", file=sys.stderr)
             return jsonify({
                 "response_action": "push",
                 "view": create_modal
