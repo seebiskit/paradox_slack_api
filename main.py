@@ -235,22 +235,11 @@ def handle_interactions():
                 )
                 print(f"Built metric modal for category: {category_data['name']}", file=sys.stderr)
                 
-                # Update the current view instead of pushing (no trigger_id needed)
-                resp = requests.post(
-                    "https://slack.com/api/views.update",
-                    headers={
-                        "Authorization": f"Bearer {BOT_TOKEN}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "view_id": payload["view"]["id"],
-                        "view": metric_modal
-                    }
-                )
-                
-                print(f"views.update status: {resp.status_code}", file=sys.stderr)
-                print(f"views.update response: {resp.text}", file=sys.stderr)
-                return "", 200
+                # Return the response that tells Slack to update the view
+                return jsonify({
+                    "response_action": "update",
+                    "view": metric_modal
+                })
         
         return jsonify({"response_action": "clear"})
 
