@@ -7,8 +7,7 @@ app = Flask(__name__)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-CSV_PATH = Path("metrics.csv")
-
+CSV_PATH = Path("data/metrics.csv")
 
 def append_metric_row(user_id: str, metric_name: str, metric_value: str):
     new_file = not CSV_PATH.exists()
