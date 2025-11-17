@@ -263,6 +263,8 @@ def handle_slash_command():
     user_id = request.form.get("user_id")
     channel_id = request.form.get("channel_id")
     
+    print(f"Slash command - Channel ID: {channel_id}", file=sys.stderr)
+    
     modal = build_category_selection_modal(user_id)
     
     # Store channel ID in modal metadata for later use
@@ -519,6 +521,7 @@ def handle_interactions():
         # Get channel ID from metadata
         channel_info = json.loads(payload["view"].get("private_metadata", "{}"))
         channel_id = channel_info.get("channel_id")
+        print(f"Category selection - Channel ID from metadata: {channel_id}", file=sys.stderr)
 
         state_values = payload["view"]["state"]["values"]
         selection = state_values["category_select"]["category_selection"]["selected_option"]["value"]
@@ -566,6 +569,7 @@ def handle_interactions():
         metadata = json.loads(payload["view"]["private_metadata"])
         category_id = metadata.get("category_id")
         channel_id = metadata.get("channel_id")
+        print(f"Metric submission - Channel ID from metadata: {channel_id}", file=sys.stderr)
         
         state_values = payload["view"]["state"]["values"]
         
