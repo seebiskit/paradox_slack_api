@@ -119,7 +119,11 @@ def handle_slash_command():
     print("views.open status:", resp.status_code, file=sys.stderr)
     print("views.open body:", resp.text, file=sys.stderr)
 
-    return jsonify(response_type="ephemeral", text="Opening modal…")
+    # Return empty response after successfully opening modal
+    if resp.status_code == 200:
+        return "", 200
+    else:
+        return jsonify(response_type="ephemeral", text="Error opening modal")
 
 
 def build_metric_entry_modal(category_id: int, category_name: str, metric_definitions: list):
@@ -235,9 +239,9 @@ def handle_interactions():
                 )
                 print(f"Built metric modal for category: {category_data['name']}", file=sys.stderr)
                 
-                # Return the response that tells Slack to update the view
+                # Return the response that tells Slack to push a new view
                 return jsonify({
-                    "response_action": "update",
+                    "response_action": "push",
                     "view": metric_modal
                 })
         
