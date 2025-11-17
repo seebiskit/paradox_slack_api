@@ -179,7 +179,7 @@ def get_user_categories(user_id: str) -> List[Dict]:
         conn.close()
 
 def create_category_from_template(template_id: int, user_id: str, custom_name: str = None) -> int:
-    """Create a user's category instance from a template"""
+    """Create a user's category instance from a template, or return existing one"""
     conn = get_connection()
     cursor = conn.cursor()
     
@@ -190,8 +190,19 @@ def create_category_from_template(template_id: int, user_id: str, custom_name: s
         if not template:
             raise ValueError("Template not found")
         
-        # Create user category
         category_name = custom_name or template['name']
+        
+        # Check if user already has this category
+        cursor.execute("""
+            SELECT id FROM categories 
+            WHERE name = ? AND created_by_user_id = ? AND is_template = FALSE
+        """, (category_name, user_id))
+        
+        existing = cursor.fetchone()
+        if existing:
+            return existing['id']
+        
+        # Create user category
         cursor.execute("""
             INSERT INTO categories (name, description, icon, is_template, created_by_user_id)
             VALUES (?, ?, ?, FALSE, ?)
