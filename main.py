@@ -43,58 +43,100 @@ def append_metric_rows(category_name: str, user_id: str, metric_date: str,
 
 def build_category_selection_modal(user_id: str):
     """Build the category selection modal"""
-    templates = get_category_templates()
     user_categories = get_user_categories(user_id)
     
     options = []
     
-    # Add section headers and templates
-    if templates:
+    # Only show user's existing categories
+    for category in user_categories:
         options.append({
-            "text": {"type": "plain_text", "text": "── Templates ──"},
-            "value": "header_templates"
+            "text": {"type": "plain_text", "text": f"{category['icon']} {category['name']}"},
+            "value": f"category_{category['id']}"
         })
-        
-        for template in templates:
-            options.append({
-                "text": {
-                    "type": "plain_text",
-                    "text": f"{template['icon']} {template['name']}"
-                },
-                "value": f"template_{template['id']}"
-            })
     
-    # Add user's existing categories
-    if user_categories:
-        options.append({
-            "text": {"type": "plain_text", "text": "── My Categories ──"},
-            "value": "header_mine"
-        })
-        
-        for category in user_categories:
-            options.append({
-                "text": {"type": "plain_text", "text": f"{category['icon']} {category['name']}"},
-                "value": f"category_{category['id']}"
-            })
+    # Sort all options alphabetically by display text
+    options.sort(key=lambda x: x["text"]["text"])
+    
+    blocks = [
+        {
+            "type": "input",
+            "block_id": "category_select",
+            "element": {
+                "type": "static_select",
+                "action_id": "category_selection",
+                "placeholder": {"type": "plain_text", "text": "Choose or type to search..."},
+                "options": options
+            },
+            "label": {"type": "plain_text", "text": "Category"}
+        }
+    ]
+    
+    # Add create category button if user has categories or always show it
+    blocks.append({
+        "type": "actions",
+        "elements": [
+            {
+                "type": "button",
+                "action_id": "create_category_button",
+                "text": {"type": "plain_text", "text": "➕ Create New Category"},
+                "style": "primary"
+            }
+        ]
+    })
     
     return {
         "type": "modal",
         "callback_id": "select_category_modal",
         "title": {"type": "plain_text", "text": "Log Metrics"},
+        "blocks": blocks,
+        "submit": {"type": "plain_text", "text": "Next"}
+    }
+
+def build_create_category_modal():
+    """Build the create category modal with template selection"""
+    templates = get_category_templates()
+    
+    options = []
+    
+    # Add all available templates
+    for template in templates:
+        options.append({
+            "text": {
+                "type": "plain_text",
+                "text": f"{template['icon']} {template['name']}"
+            },
+            "value": f"template_{template['id']}"
+        })
+    
+    return {
+        "type": "modal",
+        "callback_id": "create_category_modal",
+        "title": {"type": "plain_text", "text": "Create Category"},
         "blocks": [
             {
                 "type": "input",
-                "block_id": "category_select",
+                "block_id": "template_select",
                 "element": {
                     "type": "static_select",
-                    "action_id": "category_selection",
-                    "placeholder": {"type": "plain_text", "text": "Choose a category..."},
+                    "action_id": "template_selection",
+                    "placeholder": {"type": "plain_text", "text": "Choose a template..."},
                     "options": options
                 },
-                "label": {"type": "plain_text", "text": "Category"}
+                "label": {"type": "plain_text", "text": "Template"}
+            },
+            {
+                "type": "input",
+                "block_id": "category_name",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "name_input",
+                    "placeholder": {"type": "plain_text", "text": "Enter custom name (optional)"}
+                },
+                "label": {"type": "plain_text", "text": "Category Name"},
+                "optional": True
             }
         ],
-        "submit": {"type": "plain_text", "text": "Next"}
+        "submit": {"type": "plain_text", "text": "Create Category"}
     }
 
 @app.post("/slack/commands")
@@ -209,6 +251,58 @@ def handle_interactions():
     payload = json.loads(payload_raw)
     user_id = payload.get("user", {}).get("id", "unknown")
 
+    # Handle create category button click
+    if payload.get("type") == "block_actions":
+        action = payload["actions"][0]
+        if action["action_id"] == "create_category_button":
+            create_modal = build_create_category_modal()
+            return jsonify({
+                "response_action": "push",
+                "view": create_modal
+            })
+
+    # Handle create category form submission
+    if payload.get("type") == "view_submission" and \
+       payload.get("view", {}).get("callback_id") == "create_category_modal":
+        
+        state_values = payload["view"]["state"]["values"]
+        
+        # Get template selection
+        template_selection = state_values["template_select"]["template_selection"]["selected_option"]["value"]
+        template_id = int(template_selection.split("_")[1])
+        
+        # Get custom name if provided
+        custom_name = None
+        if "category_name" in state_values and state_values["category_name"]["name_input"]["value"]:
+            custom_name = state_values["category_name"]["name_input"]["value"].strip()
+        
+        # Create category from template
+        try:
+            category_id = create_category_from_template(template_id, user_id, custom_name)
+            print(f"Created category {category_id} for user {user_id}", file=sys.stderr)
+            
+            # After creating category, redirect to metric entry modal
+            category_data = get_category_with_metrics(category_id)
+            if category_data:
+                metric_modal = build_metric_entry_modal(
+                    category_id, 
+                    category_data['name'], 
+                    category_data['metrics']
+                )
+                
+                return jsonify({
+                    "response_action": "update",
+                    "view": metric_modal
+                })
+        except Exception as e:
+            print(f"Error creating category: {e}", file=sys.stderr)
+            return jsonify({
+                "response_action": "errors",
+                "errors": {
+                    "category_name": "Failed to create category. It may already exist."
+                }
+            })
+
     # Handle category selection
     if payload.get("type") == "view_submission" and \
        payload.get("view", {}).get("callback_id") == "select_category_modal":
@@ -220,11 +314,8 @@ def handle_interactions():
         
         category_id = None
         
-        if selection.startswith("template_"):
-            template_id = int(selection.split("_")[1])
-            # Create category from template
-            category_id = create_category_from_template(template_id, user_id)
-        elif selection.startswith("category_"):
+        # Only handle existing user categories
+        if selection.startswith("category_"):
             category_id = int(selection.split("_")[1])
         
         if category_id:
