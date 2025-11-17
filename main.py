@@ -641,9 +641,25 @@ def handle_interactions():
                 # Don't overwrite the channel_id variable!
                 print(f"About to post - channel_id is: {channel_id}", file=sys.stderr)
                 
+                # Get user display name
+                user_display_name = "Someone"
+                try:
+                    user_info_resp = requests.get(
+                        "https://slack.com/api/users.info",
+                        headers={"Authorization": f"Bearer {BOT_TOKEN}"},
+                        params={"user": user_id}
+                    )
+                    if user_info_resp.status_code == 200:
+                        user_data = user_info_resp.json()
+                        if user_data.get("ok"):
+                            user_display_name = user_data.get("user", {}).get("profile", {}).get("display_name") or user_data.get("user", {}).get("real_name") or user_data.get("user", {}).get("name", "Someone")
+                except Exception as e:
+                    print(f"Error getting user info: {e}", file=sys.stderr)
+
                 # Build message
                 message_lines = [
-                    f"📊 *{category_data['icon']} {category_data['name']}* ({metric_date})",
+                    f"📊 *{user_display_name} logged a metric*",
+                    f"*{category_data['icon']} {category_data['name']}* ({metric_date})",
                     "",
                     "\n".join(metric_display_list)
                 ]
@@ -670,13 +686,29 @@ def handle_interactions():
                             "unfurl_links": False
                         }
                     )
+                    response_data = resp.json()
                     actual_channel_used = channel_id or payload.get("user", {}).get("id")
                     print(f"Posted to Slack: {resp.status_code}", file=sys.stderr)
                     print(f"Slack response: {resp.text}", file=sys.stderr)
-                    print(f"Channel ID from metadata: {channel_id}", file=sys.stderr)
-                    print(f"User ID fallback: {payload.get('user', {}).get('id')}", file=sys.stderr)
-                    print(f"Actual channel used: {actual_channel_used}", file=sys.stderr)
-                    print(f"Message text: {message_text}", file=sys.stderr)
+                    
+                    # If bot not in channel, try sending DM instead
+                    if not response_data.get("ok") and response_data.get("error") == "not_in_channel":
+                        user_id_for_dm = payload.get("user", {}).get("id")
+                        print(f"Bot not in channel, sending DM to user {user_id_for_dm}", file=sys.stderr)
+                        
+                        dm_resp = requests.post(
+                            "https://slack.com/api/chat.postMessage",
+                            headers={
+                                "Authorization": f"Bearer {BOT_TOKEN}",
+                                "Content-Type": "application/json",
+                            },
+                            json={
+                                "channel": user_id_for_dm,
+                                "text": f"📊 *Metrics logged!* (Bot not in channel, so sending you a DM)\n\n{message_text}",
+                                "unfurl_links": False
+                            }
+                        )
+                        print(f"DM sent: {dm_resp.status_code} - {dm_resp.text}", file=sys.stderr)
                 except Exception as e:
                     print(f"Error posting to Slack: {e}", file=sys.stderr)
 
