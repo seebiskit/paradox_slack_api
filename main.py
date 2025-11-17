@@ -665,6 +665,9 @@ def handle_interactions():
                         }
                     )
                     print(f"Posted to Slack: {resp.status_code}", file=sys.stderr)
+                    print(f"Slack response: {resp.text}", file=sys.stderr)
+                    print(f"Channel ID used: {channel_id}", file=sys.stderr)
+                    print(f"Message text: {message_text}", file=sys.stderr)
                 except Exception as e:
                     print(f"Error posting to Slack: {e}", file=sys.stderr)
 
