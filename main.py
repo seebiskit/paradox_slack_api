@@ -163,6 +163,22 @@ def build_add_metrics_modal(category_name, category_icon):
             },
             {
                 "type": "input",
+                "block_id": "metric1_optional",
+                "element": {
+                    "type": "checkboxes",
+                    "action_id": "optional_input",
+                    "options": [
+                        {
+                            "text": {"type": "plain_text", "text": "Make this metric optional"},
+                            "value": "optional"
+                        }
+                    ]
+                },
+                "label": {"type": "plain_text", "text": "Metric 1 Settings"},
+                "optional": True
+            },
+            {
+                "type": "input",
                 "block_id": "metric2_name",
                 "element": {
                     "type": "plain_text_input",
@@ -181,6 +197,22 @@ def build_add_metrics_modal(category_name, category_icon):
                     "placeholder": {"type": "plain_text", "text": "e.g., people, count"}
                 },
                 "label": {"type": "plain_text", "text": "Metric 2 Units"},
+                "optional": True
+            },
+            {
+                "type": "input",
+                "block_id": "metric2_optional",
+                "element": {
+                    "type": "checkboxes",
+                    "action_id": "optional_input",
+                    "options": [
+                        {
+                            "text": {"type": "plain_text", "text": "Make this metric optional"},
+                            "value": "optional"
+                        }
+                    ]
+                },
+                "label": {"type": "plain_text", "text": "Metric 2 Settings"},
                 "optional": True
             },
             {
@@ -204,6 +236,22 @@ def build_add_metrics_modal(category_name, category_icon):
                 },
                 "label": {"type": "plain_text", "text": "Metric 3 Units"},
                 "optional": True
+            },
+            {
+                "type": "input",
+                "block_id": "metric3_optional",
+                "element": {
+                    "type": "checkboxes",
+                    "action_id": "optional_input",
+                    "options": [
+                        {
+                            "text": {"type": "plain_text", "text": "Make this metric optional"},
+                            "value": "optional"
+                        }
+                    ]
+                },
+                "label": {"type": "plain_text", "text": "Metric 3 Settings"},
+                "optional": True
             }
         ],
         "submit": {"type": "plain_text", "text": "Create Category"}
@@ -213,8 +261,12 @@ def build_add_metrics_modal(category_name, category_icon):
 def handle_slash_command():
     trigger_id = request.form.get("trigger_id")
     user_id = request.form.get("user_id")
+    channel_id = request.form.get("channel_id")
     
     modal = build_category_selection_modal(user_id)
+    
+    # Store channel ID in modal metadata for later use
+    modal["private_metadata"] = json.dumps({"channel_id": channel_id})
 
     resp = requests.post(
         "https://slack.com/api/views.open",
@@ -297,6 +349,30 @@ def build_metric_entry_modal(category_id: int, category_name: str, metric_defini
         "label": {"type": "plain_text", "text": "📝 Notes"}
     })
     
+    # Post to Slack checkbox (default checked)
+    blocks.append({
+        "type": "input",
+        "block_id": "post_to_slack",
+        "optional": True,
+        "element": {
+            "type": "checkboxes",
+            "action_id": "post_checkbox",
+            "initial_options": [
+                {
+                    "text": {"type": "plain_text", "text": "Post metric to Slack"},
+                    "value": "post_to_slack"
+                }
+            ],
+            "options": [
+                {
+                    "text": {"type": "plain_text", "text": "Post metric to Slack"},
+                    "value": "post_to_slack"
+                }
+            ]
+        },
+        "label": {"type": "plain_text", "text": "📢 Share Results"}
+    })
+    
     # Keep title under 25 characters
     if len(category_name) > 20:
         title = f"Log {category_name[:16]}..."
@@ -305,9 +381,8 @@ def build_metric_entry_modal(category_id: int, category_name: str, metric_defini
     
     return {
         "type": "modal",
-        "callback_id": "log_metrics_modal",
+        "callback_id": "log_metrics_modal", 
         "title": {"type": "plain_text", "text": title},
-        "private_metadata": str(category_id),
         "blocks": blocks,
         "submit": {"type": "plain_text", "text": "Log All"}
     }
@@ -383,6 +458,7 @@ def handle_interactions():
         for i in range(1, 4):  # metrics 1, 2, 3
             name_key = f"metric{i}_name"
             units_key = f"metric{i}_units"
+            optional_key = f"metric{i}_optional"
             
             if name_key in state_values and state_values[name_key]["name_input"]["value"]:
                 metric_name = state_values[name_key]["name_input"]["value"].strip()
@@ -390,9 +466,15 @@ def handle_interactions():
                 if units_key in state_values and state_values[units_key]["units_input"]["value"]:
                     metric_units = state_values[units_key]["units_input"]["value"].strip()
                 
+                # Check if metric is marked as optional
+                is_optional = False
+                if optional_key in state_values and state_values[optional_key]["optional_input"]["selected_options"]:
+                    is_optional = True
+                
                 metrics.append({
                     "name": metric_name,
-                    "units": metric_units or None
+                    "units": metric_units or None,
+                    "is_required": not is_optional
                 })
         
         if not metrics:
@@ -434,6 +516,10 @@ def handle_interactions():
     if payload.get("type") == "view_submission" and \
        payload.get("view", {}).get("callback_id") == "select_category_modal":
 
+        # Get channel ID from metadata
+        channel_info = json.loads(payload["view"].get("private_metadata", "{}"))
+        channel_id = channel_info.get("channel_id")
+
         state_values = payload["view"]["state"]["values"]
         selection = state_values["category_select"]["category_selection"]["selected_option"]["value"]
         
@@ -455,6 +541,13 @@ def handle_interactions():
                     category_data['name'], 
                     category_data['metrics']
                 )
+                
+                # Pass channel ID to metric modal
+                metric_modal["private_metadata"] = json.dumps({
+                    "category_id": category_id,
+                    "channel_id": channel_id
+                })
+                
                 print(f"Built metric modal for category: {category_data['name']}", file=sys.stderr)
                 
                 # Return the response that tells Slack to push a new view
@@ -469,7 +562,11 @@ def handle_interactions():
     elif payload.get("type") == "view_submission" and \
          payload.get("view", {}).get("callback_id") == "log_metrics_modal":
 
-        category_id = int(payload["view"]["private_metadata"])
+        # Get metadata (category_id and channel_id)
+        metadata = json.loads(payload["view"]["private_metadata"])
+        category_id = metadata.get("category_id")
+        channel_id = metadata.get("channel_id")
+        
         state_values = payload["view"]["state"]["values"]
         
         # Get metric date
@@ -480,12 +577,18 @@ def handle_interactions():
         if "notes" in state_values and state_values["notes"]["notes_input"]["value"]:
             notes = state_values["notes"]["notes_input"]["value"]
         
+        # Check if should post to Slack
+        should_post_to_slack = False
+        if "post_to_slack" in state_values and state_values["post_to_slack"]["post_checkbox"]["selected_options"]:
+            should_post_to_slack = True
+        
         # Get category details
         category_data = get_category_with_metrics(category_id)
         
         # Extract metric values
         metric_values = []
         metric_entries_for_csv = []
+        metric_display_list = []
         
         for metric_def in category_data['metrics']:
             block_id = f"metric_{metric_def['id']}"
@@ -503,6 +606,13 @@ def handle_interactions():
                         'value': value,
                         'units': metric_def['units']
                     })
+                    
+                    # Format for display
+                    units_display = f" {metric_def['units']}" if metric_def['units'] else ""
+                    # Format number nicely (remove .0 for whole numbers)
+                    formatted_value = int(value) if value == int(value) else value
+                    metric_display_list.append(f"• {metric_def['name']}: {formatted_value}{units_display}")
+                    
                 except ValueError:
                     print(f"Invalid value for {metric_def['name']}", file=sys.stderr)
         
@@ -520,6 +630,43 @@ def handle_interactions():
             )
             
             print(f"Logged {len(logged_ids)} metrics for category {category_data['name']}", file=sys.stderr)
+            
+            # Post to Slack if requested
+            if should_post_to_slack and metric_display_list:
+                channel_id = payload.get("view", {}).get("root_view_id")  # Try to get original channel
+                
+                # Build message
+                message_lines = [
+                    f"📊 *{category_data['icon']} {category_data['name']}* ({metric_date})",
+                    "",
+                    "\n".join(metric_display_list)
+                ]
+                
+                if notes:
+                    message_lines.extend(["", f"📝 {notes}"])
+                
+                message_text = "\n".join(message_lines)
+                
+                # Get channel ID from original slash command context if available
+                original_channel = request.form.get("channel_id") if hasattr(request, 'form') else None
+                
+                # Post message to Slack
+                try:
+                    resp = requests.post(
+                        "https://slack.com/api/chat.postMessage",
+                        headers={
+                            "Authorization": f"Bearer {BOT_TOKEN}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "channel": channel_id or payload.get("user", {}).get("id"),  # Post to original channel or DM
+                            "text": message_text,
+                            "unfurl_links": False
+                        }
+                    )
+                    print(f"Posted to Slack: {resp.status_code}", file=sys.stderr)
+                except Exception as e:
+                    print(f"Error posting to Slack: {e}", file=sys.stderr)
 
         return jsonify({"response_action": "clear"})
 

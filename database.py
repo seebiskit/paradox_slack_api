@@ -268,7 +268,7 @@ def create_custom_category(name: str, icon: str, user_id: str, metrics: List[Dic
                 None,  # max_value
                 2,  # decimal_places
                 i + 1,  # display_order
-                True  # is_required
+                metric.get('is_required', True)  # is_required
             ))
         
         conn.commit()
