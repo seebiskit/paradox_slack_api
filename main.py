@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime, timezone, date
 from database import (
     init_database, get_category_templates, get_user_categories, 
-    get_category_with_metrics, create_category_from_template, log_metrics
+    get_category_with_metrics, create_category_from_template, log_metrics, create_custom_category
 )
 from category_templates import setup_default_templates
 
@@ -93,21 +93,7 @@ def build_category_selection_modal(user_id: str):
     }
 
 def build_create_category_modal():
-    """Build the create category modal with template selection"""
-    templates = get_category_templates()
-    
-    options = []
-    
-    # Add all available templates
-    for template in templates:
-        options.append({
-            "text": {
-                "type": "plain_text",
-                "text": f"{template['icon']} {template['name']}"
-            },
-            "value": f"template_{template['id']}"
-        })
-    
+    """Build the create category modal for custom categories"""
     return {
         "type": "modal",
         "callback_id": "create_category_modal",
@@ -115,24 +101,108 @@ def build_create_category_modal():
         "blocks": [
             {
                 "type": "input",
-                "block_id": "template_select",
-                "element": {
-                    "type": "static_select",
-                    "action_id": "template_selection",
-                    "placeholder": {"type": "plain_text", "text": "Choose a template..."},
-                    "options": options
-                },
-                "label": {"type": "plain_text", "text": "Template"}
-            },
-            {
-                "type": "input",
                 "block_id": "category_name",
                 "element": {
                     "type": "plain_text_input",
                     "action_id": "name_input",
-                    "placeholder": {"type": "plain_text", "text": "Enter custom name (optional)"}
+                    "placeholder": {"type": "plain_text", "text": "e.g., Special Event Attendance"}
                 },
-                "label": {"type": "plain_text", "text": "Category Name"},
+                "label": {"type": "plain_text", "text": "Category Name"}
+            },
+            {
+                "type": "input",
+                "block_id": "category_icon",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "icon_input",
+                    "placeholder": {"type": "plain_text", "text": "e.g., 🎉 or 📊"},
+                    "max_length": 2
+                },
+                "label": {"type": "plain_text", "text": "Icon (emoji)"},
+                "optional": True
+            }
+        ],
+        "submit": {"type": "plain_text", "text": "Next: Add Metrics"}
+    }
+
+def build_add_metrics_modal(category_name, category_icon):
+    """Build the modal for adding metrics to a new category"""
+    return {
+        "type": "modal",
+        "callback_id": "add_metrics_modal",
+        "title": {"type": "plain_text", "text": "Add Metrics"},
+        "private_metadata": json.dumps({"name": category_name, "icon": category_icon}),
+        "blocks": [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Category:* {category_icon} {category_name}\n\nAdd the metrics you want to track:"
+                }
+            },
+            {
+                "type": "input",
+                "block_id": "metric1_name",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "name_input",
+                    "placeholder": {"type": "plain_text", "text": "e.g., Adults, Revenue, Duration"}
+                },
+                "label": {"type": "plain_text", "text": "Metric 1 Name"}
+            },
+            {
+                "type": "input",
+                "block_id": "metric1_units",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "units_input",
+                    "placeholder": {"type": "plain_text", "text": "e.g., people, dollars, minutes"}
+                },
+                "label": {"type": "plain_text", "text": "Metric 1 Units"},
+                "optional": True
+            },
+            {
+                "type": "input",
+                "block_id": "metric2_name",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "name_input",
+                    "placeholder": {"type": "plain_text", "text": "e.g., Children, Transactions"}
+                },
+                "label": {"type": "plain_text", "text": "Metric 2 Name"},
+                "optional": True
+            },
+            {
+                "type": "input",
+                "block_id": "metric2_units",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "units_input",
+                    "placeholder": {"type": "plain_text", "text": "e.g., people, count"}
+                },
+                "label": {"type": "plain_text", "text": "Metric 2 Units"},
+                "optional": True
+            },
+            {
+                "type": "input",
+                "block_id": "metric3_name",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "name_input",
+                    "placeholder": {"type": "plain_text", "text": "Add another metric (optional)"}
+                },
+                "label": {"type": "plain_text", "text": "Metric 3 Name"},
+                "optional": True
+            },
+            {
+                "type": "input",
+                "block_id": "metric3_units",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "units_input",
+                    "placeholder": {"type": "plain_text", "text": "Units for metric 3"}
+                },
+                "label": {"type": "plain_text", "text": "Metric 3 Units"},
                 "optional": True
             }
         ],
@@ -278,25 +348,65 @@ def handle_interactions():
             print(f"views.push response: {resp.text}", file=sys.stderr)
             return "", 200
 
-    # Handle create category form submission
+    # Handle create category form submission (step 1 - name and icon)
     if payload.get("type") == "view_submission" and \
        payload.get("view", {}).get("callback_id") == "create_category_modal":
         
         state_values = payload["view"]["state"]["values"]
         
-        # Get template selection
-        template_selection = state_values["template_select"]["template_selection"]["selected_option"]["value"]
-        template_id = int(template_selection.split("_")[1])
+        # Get category name and icon
+        category_name = state_values["category_name"]["name_input"]["value"].strip()
+        category_icon = "📊"  # default
+        if "category_icon" in state_values and state_values["category_icon"]["icon_input"]["value"]:
+            category_icon = state_values["category_icon"]["icon_input"]["value"].strip()
         
-        # Get custom name if provided
-        custom_name = None
-        if "category_name" in state_values and state_values["category_name"]["name_input"]["value"]:
-            custom_name = state_values["category_name"]["name_input"]["value"].strip()
+        # Show the add metrics modal
+        add_metrics_modal = build_add_metrics_modal(category_name, category_icon)
+        return jsonify({
+            "response_action": "update",
+            "view": add_metrics_modal
+        })
+
+    # Handle add metrics form submission (step 2 - define metrics)
+    if payload.get("type") == "view_submission" and \
+       payload.get("view", {}).get("callback_id") == "add_metrics_modal":
         
-        # Create category from template
+        # Get category info from private metadata
+        category_info = json.loads(payload["view"]["private_metadata"])
+        category_name = category_info["name"]
+        category_icon = category_info["icon"]
+        
+        state_values = payload["view"]["state"]["values"]
+        
+        # Extract metrics
+        metrics = []
+        for i in range(1, 4):  # metrics 1, 2, 3
+            name_key = f"metric{i}_name"
+            units_key = f"metric{i}_units"
+            
+            if name_key in state_values and state_values[name_key]["name_input"]["value"]:
+                metric_name = state_values[name_key]["name_input"]["value"].strip()
+                metric_units = ""
+                if units_key in state_values and state_values[units_key]["units_input"]["value"]:
+                    metric_units = state_values[units_key]["units_input"]["value"].strip()
+                
+                metrics.append({
+                    "name": metric_name,
+                    "units": metric_units or None
+                })
+        
+        if not metrics:
+            return jsonify({
+                "response_action": "errors",
+                "errors": {
+                    "metric1_name": "At least one metric is required."
+                }
+            })
+        
+        # Create the custom category
         try:
-            category_id = create_category_from_template(template_id, user_id, custom_name)
-            print(f"Created category {category_id} for user {user_id}", file=sys.stderr)
+            category_id = create_custom_category(category_name, category_icon, user_id, metrics)
+            print(f"Created custom category {category_id} for user {user_id}", file=sys.stderr)
             
             # After creating category, redirect to metric entry modal
             category_data = get_category_with_metrics(category_id)
@@ -312,7 +422,7 @@ def handle_interactions():
                     "view": metric_modal
                 })
         except Exception as e:
-            print(f"Error creating category: {e}", file=sys.stderr)
+            print(f"Error creating custom category: {e}", file=sys.stderr)
             return jsonify({
                 "response_action": "errors",
                 "errors": {

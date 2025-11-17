@@ -238,6 +238,45 @@ def create_category_from_template(template_id: int, user_id: str, custom_name: s
     finally:
         conn.close()
 
+def create_custom_category(name: str, icon: str, user_id: str, metrics: List[Dict]) -> int:
+    """Create a completely custom category with custom metrics"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Create category
+        cursor.execute("""
+            INSERT INTO categories (name, description, icon, is_template, created_by_user_id)
+            VALUES (?, ?, ?, FALSE, ?)
+        """, (name, f"Custom category: {name}", icon or "📊", user_id))
+        
+        category_id = cursor.lastrowid
+        
+        # Insert metric definitions
+        for i, metric in enumerate(metrics):
+            cursor.execute("""
+                INSERT INTO metric_definitions 
+                (category_id, name, units, validation_type, min_value, max_value, 
+                 decimal_places, display_order, is_required)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                category_id,
+                metric['name'],
+                metric.get('units'),
+                'number',  # default validation type
+                0,  # min_value
+                None,  # max_value
+                2,  # decimal_places
+                i + 1,  # display_order
+                True  # is_required
+            ))
+        
+        conn.commit()
+        return category_id
+        
+    finally:
+        conn.close()
+
 def log_metrics(category_id: int, user_id: str, metric_date: str, 
                 metric_values: List[Dict], notes: str = None) -> List[int]:
     """Log multiple metrics for a category"""
