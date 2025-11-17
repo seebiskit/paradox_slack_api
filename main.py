@@ -570,6 +570,7 @@ def handle_interactions():
         category_id = metadata.get("category_id")
         channel_id = metadata.get("channel_id")
         print(f"Metric submission - Channel ID from metadata: {channel_id}", file=sys.stderr)
+        print(f"Full metadata: {metadata}", file=sys.stderr)
         
         state_values = payload["view"]["state"]["values"]
         
@@ -637,7 +638,8 @@ def handle_interactions():
             
             # Post to Slack if requested
             if should_post_to_slack and metric_display_list:
-                channel_id = payload.get("view", {}).get("root_view_id")  # Try to get original channel
+                # Don't overwrite the channel_id variable!
+                print(f"About to post - channel_id is: {channel_id}", file=sys.stderr)
                 
                 # Build message
                 message_lines = [
@@ -668,9 +670,12 @@ def handle_interactions():
                             "unfurl_links": False
                         }
                     )
+                    actual_channel_used = channel_id or payload.get("user", {}).get("id")
                     print(f"Posted to Slack: {resp.status_code}", file=sys.stderr)
                     print(f"Slack response: {resp.text}", file=sys.stderr)
-                    print(f"Channel ID used: {channel_id}", file=sys.stderr)
+                    print(f"Channel ID from metadata: {channel_id}", file=sys.stderr)
+                    print(f"User ID fallback: {payload.get('user', {}).get('id')}", file=sys.stderr)
+                    print(f"Actual channel used: {actual_channel_used}", file=sys.stderr)
                     print(f"Message text: {message_text}", file=sys.stderr)
                 except Exception as e:
                     print(f"Error posting to Slack: {e}", file=sys.stderr)
