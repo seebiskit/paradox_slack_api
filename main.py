@@ -1,13 +1,34 @@
 from flask import Flask, request, jsonify
 import os, requests, sys, json, csv
+import threading
 from pathlib import Path
 from datetime import datetime, timezone, date
 from database import (
-    init_database, get_category_templates, get_user_categories, 
+    init_database, get_category_templates, get_user_categories,
     get_category_with_metrics, create_category_from_template, log_metrics, create_custom_category
 )
 from category_templates import setup_default_templates
 from google_sheets_sync import sync_metrics_to_sheets
+
+
+def sync_to_sheets_background(category_name, metric_entries, metric_date, user_display_name, notes,
+                               slack_message_ts=None, channel_id=None):
+    """Sync to Google Sheets in background thread. Optionally update Slack message on failure."""
+    try:
+        sheets_success = sync_metrics_to_sheets(
+            category_name=category_name,
+            metric_entries=metric_entries,
+            metric_date=metric_date,
+            user_display_name=user_display_name,
+            notes=notes
+        )
+        if sheets_success:
+            print("Background: Synced metrics to Google Sheets", file=sys.stderr)
+        else:
+            print("Background: Google Sheets sync failed", file=sys.stderr)
+            # Could update Slack message here if needed
+    except Exception as e:
+        print(f"Background: Error syncing to Google Sheets: {e}", file=sys.stderr)
 
 app = Flask(__name__)
 
@@ -639,7 +660,7 @@ def handle_interactions():
             
             print(f"Logged {len(logged_ids)} metrics for category {category_data['name']}", file=sys.stderr)
             
-            # Get user display name for Google Sheets (we'll get it again for Slack later if needed)
+            # Get user display name (used for both Slack and Google Sheets)
             user_display_name = "Unknown User"
             try:
                 user_info_resp = requests.get(
@@ -652,59 +673,24 @@ def handle_interactions():
                     if user_data.get("ok"):
                         profile = user_data.get("user", {}).get("profile", {})
                         user_display_name = (
-                            profile.get("display_name") or 
-                            profile.get("real_name") or 
-                            user_data.get("user", {}).get("real_name") or 
+                            profile.get("display_name") or
+                            profile.get("real_name") or
+                            user_data.get("user", {}).get("real_name") or
                             user_data.get("user", {}).get("name", "Unknown User")
                         )
             except Exception as e:
-                print(f"Error getting user info for Google Sheets: {e}", file=sys.stderr)
-            
-            # Sync to Google Sheets in real-time
-            try:
-                sheets_success = sync_metrics_to_sheets(
-                    category_name=category_data['name'],
-                    metric_entries=metric_entries_for_csv,
-                    metric_date=metric_date,
-                    user_display_name=user_display_name,
-                    notes=notes
-                )
-                if sheets_success:
-                    print("✅ Synced metrics to Google Sheets", file=sys.stderr)
-                else:
-                    print("⚠️ Google Sheets sync failed (check configuration)", file=sys.stderr)
-            except Exception as e:
-                print(f"❌ Error syncing to Google Sheets: {e}", file=sys.stderr)
-            
-            # Post to Slack if requested
+                print(f"Error getting user info: {e}", file=sys.stderr)
+
+            # Sync to Google Sheets in BACKGROUND (non-blocking)
+            sheets_thread = threading.Thread(
+                target=sync_to_sheets_background,
+                args=(category_data['name'], metric_entries_for_csv, metric_date, user_display_name, notes)
+            )
+            sheets_thread.start()
+
+            # Post to Slack if requested (this happens immediately, doesn't wait for Google Sheets)
             if should_post_to_slack and metric_display_list:
-                # Don't overwrite the channel_id variable!
                 print(f"About to post - channel_id is: {channel_id}", file=sys.stderr)
-                
-                # Get user display name
-                user_display_name = "Someone"
-                try:
-                    user_info_resp = requests.get(
-                        "https://slack.com/api/users.info",
-                        headers={"Authorization": f"Bearer {BOT_TOKEN}"},
-                        params={"user": user_id}
-                    )
-                    print(f"User info response: {user_info_resp.status_code} - {user_info_resp.text}", file=sys.stderr)
-                    if user_info_resp.status_code == 200:
-                        user_data = user_info_resp.json()
-                        if user_data.get("ok"):
-                            profile = user_data.get("user", {}).get("profile", {})
-                            user_display_name = (
-                                profile.get("display_name") or 
-                                profile.get("real_name") or 
-                                user_data.get("user", {}).get("real_name") or 
-                                user_data.get("user", {}).get("name", "Someone")
-                            )
-                            print(f"Found user display name: {user_display_name}", file=sys.stderr)
-                        else:
-                            print(f"Slack API error: {user_data.get('error')}", file=sys.stderr)
-                except Exception as e:
-                    print(f"Error getting user info: {e}", file=sys.stderr)
 
                 # Build message
                 message_lines = [
