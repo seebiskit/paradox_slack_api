@@ -671,13 +671,13 @@ def handle_interactions():
                 # Build message
                 message_lines = [
                     f"📊 *{user_display_name} logged a metric*",
-                    f"*{category_data['icon']} {category_data['name']}* ({metric_date})",
+                    f"*{category_data['name']}* ({metric_date})",
                     "",
                     "\n".join(metric_display_list)
                 ]
                 
                 if notes:
-                    message_lines.extend(["", f"📝 {notes}"])
+                    message_lines.extend(["", f"> {notes}"])
                 
                 message_text = "\n".join(message_lines)
                 
