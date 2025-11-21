@@ -50,7 +50,7 @@ def build_category_selection_modal(user_id: str):
     # Only show user's existing categories
     for category in user_categories:
         options.append({
-            "text": {"type": "plain_text", "text": f"{category['icon']} {category['name']}"},
+            "text": {"type": "plain_text", "text": category['name']},
             "value": f"category_{category['id']}"
         })
     
@@ -59,7 +59,7 @@ def build_category_selection_modal(user_id: str):
     
     # Add "Create New Category" as the last option in dropdown
     options.append({
-        "text": {"type": "plain_text", "text": "➕ Create New Category..."},
+        "text": {"type": "plain_text", "text": "Create New Category..."},
         "value": "create_new_category"
     })
     
@@ -101,18 +101,6 @@ def build_create_category_modal():
                     "placeholder": {"type": "plain_text", "text": "e.g., Special Event Attendance"}
                 },
                 "label": {"type": "plain_text", "text": "Category Name"}
-            },
-            {
-                "type": "input",
-                "block_id": "category_icon",
-                "element": {
-                    "type": "plain_text_input",
-                    "action_id": "icon_input",
-                    "placeholder": {"type": "plain_text", "text": "e.g., 🎉 or 📊"},
-                    "max_length": 2
-                },
-                "label": {"type": "plain_text", "text": "Icon (emoji)"},
-                "optional": True
             }
         ],
         "submit": {"type": "plain_text", "text": "Next: Add Metrics"}
@@ -407,11 +395,9 @@ def handle_interactions():
         
         state_values = payload["view"]["state"]["values"]
         
-        # Get category name and icon
+        # Get category name and set default icon
         category_name = state_values["category_name"]["name_input"]["value"].strip()
-        category_icon = "📊"  # default
-        if "category_icon" in state_values and state_values["category_icon"]["icon_input"]["value"]:
-            category_icon = state_values["category_icon"]["icon_input"]["value"].strip()
+        category_icon = "📊"  # default icon
         
         # Show the add metrics modal
         add_metrics_modal = build_add_metrics_modal(category_name, category_icon)
@@ -489,13 +475,24 @@ def handle_interactions():
                     "view": metric_modal
                 })
         except Exception as e:
+            error_msg = str(e).lower()
             print(f"Error creating custom category: {e}", file=sys.stderr)
-            return jsonify({
-                "response_action": "errors",
-                "errors": {
-                    "category_name": "Failed to create category. It may already exist."
-                }
-            })
+            
+            # Check if it's a duplicate name error
+            if "unique constraint" in error_msg or "already exists" in error_msg:
+                return jsonify({
+                    "response_action": "errors",
+                    "errors": {
+                        "category_name": "A category with that name already exists. Please log your metric under the existing category or pick a different name."
+                    }
+                })
+            else:
+                return jsonify({
+                    "response_action": "errors",
+                    "errors": {
+                        "category_name": "Failed to create category. Please try again."
+                    }
+                })
 
     # Handle category selection
     if payload.get("type") == "view_submission" and \
