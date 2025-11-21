@@ -414,15 +414,24 @@ def handle_interactions():
     # Handle create category form submission (step 1 - name and icon)
     if payload.get("type") == "view_submission" and \
        payload.get("view", {}).get("callback_id") == "create_category_modal":
-        
+
+        # Get channel_id from metadata
+        parent_metadata = json.loads(payload["view"].get("private_metadata", "{}"))
+        channel_id = parent_metadata.get("channel_id")
+
         state_values = payload["view"]["state"]["values"]
-        
+
         # Get category name and set default icon
         category_name = state_values["category_name"]["name_input"]["value"].strip()
         category_icon = "📊"  # default icon
-        
-        # Show the add metrics modal
+
+        # Show the add metrics modal, passing channel_id through
         add_metrics_modal = build_add_metrics_modal(category_name, category_icon)
+        add_metrics_modal["private_metadata"] = json.dumps({
+            "name": category_name,
+            "icon": category_icon,
+            "channel_id": channel_id
+        })
         return jsonify({
             "response_action": "update",
             "view": add_metrics_modal
@@ -431,11 +440,12 @@ def handle_interactions():
     # Handle add metrics form submission (step 2 - define metrics)
     if payload.get("type") == "view_submission" and \
        payload.get("view", {}).get("callback_id") == "add_metrics_modal":
-        
-        # Get category info from private metadata
+
+        # Get category info from private metadata (including channel_id)
         category_info = json.loads(payload["view"]["private_metadata"])
         category_name = category_info["name"]
         category_icon = category_info["icon"]
+        channel_id = category_info.get("channel_id")
         
         state_values = payload["view"]["state"]["values"]
         
@@ -485,11 +495,10 @@ def handle_interactions():
                     category_data['metrics']
                 )
                 
-                # Need to get channel ID - since we're in custom category flow, we need to trace it back
-                # For now, we'll have to send as DM since we can't easily get the original channel ID
+                # Pass channel_id through to the metric modal
                 metric_modal["private_metadata"] = json.dumps({
                     "category_id": category_id,
-                    "channel_id": None  # Will fall back to DM
+                    "channel_id": channel_id
                 })
                 
                 return jsonify({
@@ -536,8 +545,9 @@ def handle_interactions():
         if selection.startswith("category_"):
             category_id = int(selection.split("_")[1])
         elif selection == "create_new_category":
-            # Show create category modal
+            # Show create category modal, passing channel_id through
             create_modal = build_create_category_modal()
+            create_modal["private_metadata"] = json.dumps({"channel_id": channel_id})
             return jsonify({
                 "response_action": "update",
                 "view": create_modal
