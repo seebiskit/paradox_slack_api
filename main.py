@@ -651,10 +651,20 @@ def handle_interactions():
                         headers={"Authorization": f"Bearer {BOT_TOKEN}"},
                         params={"user": user_id}
                     )
+                    print(f"User info response: {user_info_resp.status_code} - {user_info_resp.text}", file=sys.stderr)
                     if user_info_resp.status_code == 200:
                         user_data = user_info_resp.json()
                         if user_data.get("ok"):
-                            user_display_name = user_data.get("user", {}).get("profile", {}).get("display_name") or user_data.get("user", {}).get("real_name") or user_data.get("user", {}).get("name", "Someone")
+                            profile = user_data.get("user", {}).get("profile", {})
+                            user_display_name = (
+                                profile.get("display_name") or 
+                                profile.get("real_name") or 
+                                user_data.get("user", {}).get("real_name") or 
+                                user_data.get("user", {}).get("name", "Someone")
+                            )
+                            print(f"Found user display name: {user_display_name}", file=sys.stderr)
+                        else:
+                            print(f"Slack API error: {user_data.get('error')}", file=sys.stderr)
                 except Exception as e:
                     print(f"Error getting user info: {e}", file=sys.stderr)
 
