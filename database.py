@@ -26,7 +26,7 @@ def init_database():
             is_template BOOLEAN DEFAULT FALSE,
             created_by_user_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(name, created_by_user_id)
+            UNIQUE(name)
         )
     """)
     
