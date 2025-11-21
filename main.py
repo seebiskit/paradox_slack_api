@@ -7,6 +7,7 @@ from database import (
     get_category_with_metrics, create_category_from_template, log_metrics, create_custom_category
 )
 from category_templates import setup_default_templates
+from google_sheets_sync import sync_metrics_to_sheets
 
 app = Flask(__name__)
 
@@ -637,6 +638,43 @@ def handle_interactions():
             )
             
             print(f"Logged {len(logged_ids)} metrics for category {category_data['name']}", file=sys.stderr)
+            
+            # Get user display name for Google Sheets (we'll get it again for Slack later if needed)
+            user_display_name = "Unknown User"
+            try:
+                user_info_resp = requests.get(
+                    "https://slack.com/api/users.info",
+                    headers={"Authorization": f"Bearer {BOT_TOKEN}"},
+                    params={"user": user_id}
+                )
+                if user_info_resp.status_code == 200:
+                    user_data = user_info_resp.json()
+                    if user_data.get("ok"):
+                        profile = user_data.get("user", {}).get("profile", {})
+                        user_display_name = (
+                            profile.get("display_name") or 
+                            profile.get("real_name") or 
+                            user_data.get("user", {}).get("real_name") or 
+                            user_data.get("user", {}).get("name", "Unknown User")
+                        )
+            except Exception as e:
+                print(f"Error getting user info for Google Sheets: {e}", file=sys.stderr)
+            
+            # Sync to Google Sheets in real-time
+            try:
+                sheets_success = sync_metrics_to_sheets(
+                    category_name=category_data['name'],
+                    metric_entries=metric_entries_for_csv,
+                    metric_date=metric_date,
+                    user_display_name=user_display_name,
+                    notes=notes
+                )
+                if sheets_success:
+                    print("✅ Synced metrics to Google Sheets", file=sys.stderr)
+                else:
+                    print("⚠️ Google Sheets sync failed (check configuration)", file=sys.stderr)
+            except Exception as e:
+                print(f"❌ Error syncing to Google Sheets: {e}", file=sys.stderr)
             
             # Post to Slack if requested
             if should_post_to_slack and metric_display_list:

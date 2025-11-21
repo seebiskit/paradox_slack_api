@@ -1,0 +1,26 @@
+# Environment variables
+.env
+
+# Credentials - NEVER commit these
+credentials.json
+service_account.json
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Data files
+data/

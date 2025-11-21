@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Local development
+*.log
+data/
+
+# Credentials - mounted at runtime, not baked into image
+credentials.json
+.env
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+test_*.py
