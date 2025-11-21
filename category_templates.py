@@ -66,6 +66,7 @@ def setup_default_templates():
     init_database()
     
     # Check if templates already exist
+    # why is import here?
     from database import get_category_templates
     existing_templates = get_category_templates()
     existing_names = {template['name'] for template in existing_templates}

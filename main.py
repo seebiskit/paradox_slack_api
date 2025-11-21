@@ -57,6 +57,12 @@ def build_category_selection_modal(user_id: str):
     # Sort all options alphabetically by display text
     options.sort(key=lambda x: x["text"]["text"])
     
+    # Add "Create New Category" as the last option in dropdown
+    options.append({
+        "text": {"type": "plain_text", "text": "➕ Create New Category..."},
+        "value": "create_new_category"
+    })
+    
     blocks = [
         {
             "type": "input",
@@ -70,19 +76,6 @@ def build_category_selection_modal(user_id: str):
             "label": {"type": "plain_text", "text": "Category"}
         }
     ]
-    
-    # Add create category button if user has categories or always show it
-    blocks.append({
-        "type": "actions",
-        "elements": [
-            {
-                "type": "button",
-                "action_id": "create_category_button",
-                "text": {"type": "plain_text", "text": "➕ Create New Category"},
-                "style": "primary"
-            }
-        ]
-    })
     
     return {
         "type": "modal",
@@ -265,6 +258,8 @@ def handle_slash_command():
     
     print(f"Slash command - Channel ID: {channel_id}", file=sys.stderr)
     
+    # don't think I need to send user_id back now that I'm not create any custom categories for just one user
+    # will need to add back if we want to ever control access to certain datapoints (i.e., giving)
     modal = build_category_selection_modal(user_id)
     
     # Store channel ID in modal metadata for later use
@@ -397,33 +392,14 @@ def handle_interactions():
 
     payload = json.loads(payload_raw)
     user_id = payload.get("user", {}).get("id", "unknown")
-
-    # Handle create category button click
+    # is the best design a big if statement for interactions
+    # Handle block actions (if any needed in future)
     if payload.get("type") == "block_actions":
         print(f"Block action received: {json.dumps(payload, indent=2)}", file=sys.stderr)
         action = payload["actions"][0]
         print(f"Action ID: {action.get('action_id')}", file=sys.stderr)
-        if action["action_id"] == "create_category_button":
-            print("Creating category modal...", file=sys.stderr)
-            create_modal = build_create_category_modal()
-            print(f"Category modal created: {json.dumps(create_modal, indent=2)}", file=sys.stderr)
-            
-            # Use views.push API call instead of response_action
-            resp = requests.post(
-                "https://slack.com/api/views.push",
-                headers={
-                    "Authorization": f"Bearer {BOT_TOKEN}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "trigger_id": payload["trigger_id"],
-                    "view": create_modal
-                }
-            )
-            
-            print(f"views.push status: {resp.status_code}", file=sys.stderr)
-            print(f"views.push response: {resp.text}", file=sys.stderr)
-            return "", 200
+        # No button handlers needed anymore - everything is handled via dropdown
+        return "", 200
 
     # Handle create category form submission (step 1 - name and icon)
     if payload.get("type") == "view_submission" and \
@@ -537,9 +513,16 @@ def handle_interactions():
         
         category_id = None
         
-        # Only handle existing user categories
+        # Handle different selection types
         if selection.startswith("category_"):
             category_id = int(selection.split("_")[1])
+        elif selection == "create_new_category":
+            # Show create category modal
+            create_modal = build_create_category_modal()
+            return jsonify({
+                "response_action": "update",
+                "view": create_modal
+            })
         
         if category_id:
             # Get category details and show metrics modal

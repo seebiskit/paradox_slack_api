@@ -16,6 +16,7 @@ def init_database():
     cursor = conn.cursor()
     
     # Categories table
+    # TODO make it so we can archive metrics/categories (i.e., I can view the old data, but I can't add new data and I don't see it in the tables)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS categories (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
