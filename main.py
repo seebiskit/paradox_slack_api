@@ -66,25 +66,19 @@ def append_metric_rows(category_name: str, user_id: str, metric_date: str,
 def build_category_selection_modal(user_id: str):
     """Build the category selection modal"""
     user_categories = get_user_categories(user_id)
-    
+
     options = []
-    
+
     # Only show user's existing categories
     for category in user_categories:
         options.append({
             "text": {"type": "plain_text", "text": category['name']},
             "value": f"category_{category['id']}"
         })
-    
+
     # Sort all options alphabetically by display text
     options.sort(key=lambda x: x["text"]["text"])
-    
-    # Add "Create New Category" as the last option in dropdown
-    options.append({
-        "text": {"type": "plain_text", "text": "Create New Category..."},
-        "value": "create_new_category"
-    })
-    
+
     blocks = [
         {
             "type": "input",
@@ -96,9 +90,30 @@ def build_category_selection_modal(user_id: str):
                 "options": options
             },
             "label": {"type": "plain_text", "text": "Category"}
+        },
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": "Don't see the category you're looking for?"
+                }
+            ]
+        },
+        {
+            "type": "actions",
+            "block_id": "create_category_action",
+            "elements": [
+                {
+                    "type": "button",
+                    "action_id": "create_new_category_button",
+                    "text": {"type": "plain_text", "text": "Create a new category"},
+                    "value": "create_new_category"
+                }
+            ]
         }
     ]
-    
+
     return {
         "type": "modal",
         "callback_id": "select_category_modal",
@@ -402,13 +417,36 @@ def handle_interactions():
 
     payload = json.loads(payload_raw)
     user_id = payload.get("user", {}).get("id", "unknown")
-    # is the best design a big if statement for interactions
-    # Handle block actions (if any needed in future)
+    # Handle block actions
     if payload.get("type") == "block_actions":
-        print(f"Block action received: {json.dumps(payload, indent=2)}", file=sys.stderr)
         action = payload["actions"][0]
-        print(f"Action ID: {action.get('action_id')}", file=sys.stderr)
-        # No button handlers needed anymore - everything is handled via dropdown
+        action_id = action.get("action_id")
+        print(f"Block action: {action_id}", file=sys.stderr)
+
+        # Handle "Create new category" button click
+        if action_id == "create_new_category_button":
+            # Get channel_id from the current modal's metadata
+            current_metadata = json.loads(payload["view"].get("private_metadata", "{}"))
+            channel_id = current_metadata.get("channel_id")
+
+            # Update the modal to show create category form
+            create_modal = build_create_category_modal()
+            create_modal["private_metadata"] = json.dumps({"channel_id": channel_id})
+
+            # Update the existing modal
+            resp = requests.post(
+                "https://slack.com/api/views.update",
+                headers={
+                    "Authorization": f"Bearer {BOT_TOKEN}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "view_id": payload["view"]["id"],
+                    "view": create_modal
+                }
+            )
+            print(f"views.update response: {resp.status_code}", file=sys.stderr)
+
         return "", 200
 
     # Handle create category form submission (step 1 - name and icon)
@@ -541,18 +579,10 @@ def handle_interactions():
         
         category_id = None
         
-        # Handle different selection types
+        # Handle category selection
         if selection.startswith("category_"):
             category_id = int(selection.split("_")[1])
-        elif selection == "create_new_category":
-            # Show create category modal, passing channel_id through
-            create_modal = build_create_category_modal()
-            create_modal["private_metadata"] = json.dumps({"channel_id": channel_id})
-            return jsonify({
-                "response_action": "update",
-                "view": create_modal
-            })
-        
+
         if category_id:
             # Get category details and show metrics modal
             category_data = get_category_with_metrics(category_id)
@@ -714,10 +744,7 @@ def handle_interactions():
                     message_lines.extend(["", f"> {notes}"])
                 
                 message_text = "\n".join(message_lines)
-                
-                # Get channel ID from original slash command context if available
-                original_channel = request.form.get("channel_id") if hasattr(request, 'form') else None
-                
+
                 # Post message to Slack
                 try:
                     resp = requests.post(
@@ -733,7 +760,6 @@ def handle_interactions():
                         }
                     )
                     response_data = resp.json()
-                    actual_channel_used = channel_id or payload.get("user", {}).get("id")
                     print(f"Posted to Slack: {resp.status_code}", file=sys.stderr)
                     print(f"Slack response: {resp.text}", file=sys.stderr)
                     
