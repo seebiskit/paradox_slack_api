@@ -92,25 +92,17 @@ def build_category_selection_modal(user_id: str):
             "label": {"type": "plain_text", "text": "Category"}
         },
         {
-            "type": "context",
-            "elements": [
-                {
-                    "type": "mrkdwn",
-                    "text": "Don't see the category you're looking for?"
-                }
-            ]
-        },
-        {
-            "type": "actions",
-            "block_id": "create_category_action",
-            "elements": [
-                {
-                    "type": "button",
-                    "action_id": "create_new_category_button",
-                    "text": {"type": "plain_text", "text": "Create a new category"},
-                    "value": "create_new_category"
-                }
-            ]
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "Don't see the category you're looking for?"
+            },
+            "accessory": {
+                "type": "button",
+                "action_id": "create_new_category_button",
+                "text": {"type": "plain_text", "text": "Create new"},
+                "value": "create_new_category"
+            }
         }
     ]
 
