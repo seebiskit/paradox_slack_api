@@ -172,3 +172,10 @@ If you want, I can also generate:
 * A **“Troubleshooting”** section
 * A **diagram** of the Slack → backend request flow
 * A **production deployment guide** (AWS Lambda, API Gateway, DynamoDB)
+
+
+
+### Deploy to home server
+1. Remote into server
+2. Navigate to `/opt/paradox_slack_api`
+3. Run `git pull && docker-compose down && docker-compose build && docker-compose up -d`
