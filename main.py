@@ -92,16 +92,18 @@ def build_category_selection_modal(user_id: str):
             "label": {"type": "plain_text", "text": "Category"}
         },
         {
-            "type": "divider"
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": " "
+            }
         },
         {
-            "type": "context",
-            "elements": [
-                {
-                    "type": "mrkdwn",
-                    "text": "_Don't see the category you're looking for?_"
-                }
-            ]
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "Don't see the category you're looking for?"
+            }
         },
         {
             "type": "actions",
