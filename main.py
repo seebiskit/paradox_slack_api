@@ -92,17 +92,28 @@ def build_category_selection_modal(user_id: str):
             "label": {"type": "plain_text", "text": "Category"}
         },
         {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "Don't see the category you're looking for?"
-            },
-            "accessory": {
-                "type": "button",
-                "action_id": "create_new_category_button",
-                "text": {"type": "plain_text", "text": "Create new"},
-                "value": "create_new_category"
-            }
+            "type": "divider"
+        },
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": "_Don't see the category you're looking for?_"
+                }
+            ]
+        },
+        {
+            "type": "actions",
+            "block_id": "create_category_action",
+            "elements": [
+                {
+                    "type": "button",
+                    "action_id": "create_new_category_button",
+                    "text": {"type": "plain_text", "text": "+ Create a new category"},
+                    "value": "create_new_category"
+                }
+            ]
         }
     ]
 
@@ -135,135 +146,95 @@ def build_create_category_modal():
         "submit": {"type": "plain_text", "text": "Next: Add Metrics"}
     }
 
-def build_add_metrics_modal(category_name, category_icon):
+def build_add_metrics_modal(category_name, category_icon, channel_id=None, metric_count=1, existing_values=None):
     """Build the modal for adding metrics to a new category"""
+    existing_values = existing_values or {}
+
+    blocks = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*Category:* {category_icon} {category_name}\n\nAdd the metrics you want to track:"
+            }
+        }
+    ]
+
+    # Add metric fields based on metric_count
+    for i in range(1, metric_count + 1):
+        # Only first metric is required
+        is_required = (i == 1)
+
+        blocks.append({
+            "type": "input",
+            "block_id": f"metric{i}_name",
+            "element": {
+                "type": "plain_text_input",
+                "action_id": "name_input",
+                "placeholder": {"type": "plain_text", "text": "e.g., Adults, Revenue, Duration"},
+                **({"initial_value": existing_values.get(f"metric{i}_name", "")} if existing_values.get(f"metric{i}_name") else {})
+            },
+            "label": {"type": "plain_text", "text": f"Metric {i} Name"},
+            "optional": not is_required
+        })
+
+        blocks.append({
+            "type": "input",
+            "block_id": f"metric{i}_units",
+            "element": {
+                "type": "plain_text_input",
+                "action_id": "units_input",
+                "placeholder": {"type": "plain_text", "text": "e.g., people, dollars, minutes"},
+                **({"initial_value": existing_values.get(f"metric{i}_units", "")} if existing_values.get(f"metric{i}_units") else {})
+            },
+            "label": {"type": "plain_text", "text": f"Metric {i} Units"},
+            "optional": True
+        })
+
+        blocks.append({
+            "type": "input",
+            "block_id": f"metric{i}_optional",
+            "element": {
+                "type": "checkboxes",
+                "action_id": "optional_input",
+                "options": [
+                    {
+                        "text": {"type": "plain_text", "text": "Make this metric optional"},
+                        "value": "optional"
+                    }
+                ],
+                **({"initial_options": [{"text": {"type": "plain_text", "text": "Make this metric optional"}, "value": "optional"}]} if existing_values.get(f"metric{i}_optional") else {})
+            },
+            "label": {"type": "plain_text", "text": f"Metric {i} Settings"},
+            "optional": True
+        })
+
+    # Add button to add more metrics (max 10)
+    if metric_count < 10:
+        blocks.append({
+            "type": "actions",
+            "block_id": "add_metric_action",
+            "elements": [
+                {
+                    "type": "button",
+                    "action_id": "add_another_metric",
+                    "text": {"type": "plain_text", "text": "+ Add another metric"},
+                    "value": "add_metric"
+                }
+            ]
+        })
+
     return {
         "type": "modal",
         "callback_id": "add_metrics_modal",
         "title": {"type": "plain_text", "text": "Add Metrics"},
-        "private_metadata": json.dumps({"name": category_name, "icon": category_icon}),
-        "blocks": [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*Category:* {category_icon} {category_name}\n\nAdd the metrics you want to track:"
-                }
-            },
-            {
-                "type": "input",
-                "block_id": "metric1_name",
-                "element": {
-                    "type": "plain_text_input",
-                    "action_id": "name_input",
-                    "placeholder": {"type": "plain_text", "text": "e.g., Adults, Revenue, Duration"}
-                },
-                "label": {"type": "plain_text", "text": "Metric 1 Name"}
-            },
-            {
-                "type": "input",
-                "block_id": "metric1_units",
-                "element": {
-                    "type": "plain_text_input",
-                    "action_id": "units_input",
-                    "placeholder": {"type": "plain_text", "text": "e.g., people, dollars, minutes"}
-                },
-                "label": {"type": "plain_text", "text": "Metric 1 Units"},
-                "optional": True
-            },
-            {
-                "type": "input",
-                "block_id": "metric1_optional",
-                "element": {
-                    "type": "checkboxes",
-                    "action_id": "optional_input",
-                    "options": [
-                        {
-                            "text": {"type": "plain_text", "text": "Make this metric optional"},
-                            "value": "optional"
-                        }
-                    ]
-                },
-                "label": {"type": "plain_text", "text": "Metric 1 Settings"},
-                "optional": True
-            },
-            {
-                "type": "input",
-                "block_id": "metric2_name",
-                "element": {
-                    "type": "plain_text_input",
-                    "action_id": "name_input",
-                    "placeholder": {"type": "plain_text", "text": "e.g., Children, Transactions"}
-                },
-                "label": {"type": "plain_text", "text": "Metric 2 Name"},
-                "optional": True
-            },
-            {
-                "type": "input",
-                "block_id": "metric2_units",
-                "element": {
-                    "type": "plain_text_input",
-                    "action_id": "units_input",
-                    "placeholder": {"type": "plain_text", "text": "e.g., people, count"}
-                },
-                "label": {"type": "plain_text", "text": "Metric 2 Units"},
-                "optional": True
-            },
-            {
-                "type": "input",
-                "block_id": "metric2_optional",
-                "element": {
-                    "type": "checkboxes",
-                    "action_id": "optional_input",
-                    "options": [
-                        {
-                            "text": {"type": "plain_text", "text": "Make this metric optional"},
-                            "value": "optional"
-                        }
-                    ]
-                },
-                "label": {"type": "plain_text", "text": "Metric 2 Settings"},
-                "optional": True
-            },
-            {
-                "type": "input",
-                "block_id": "metric3_name",
-                "element": {
-                    "type": "plain_text_input",
-                    "action_id": "name_input",
-                    "placeholder": {"type": "plain_text", "text": "Add another metric (optional)"}
-                },
-                "label": {"type": "plain_text", "text": "Metric 3 Name"},
-                "optional": True
-            },
-            {
-                "type": "input",
-                "block_id": "metric3_units",
-                "element": {
-                    "type": "plain_text_input",
-                    "action_id": "units_input",
-                    "placeholder": {"type": "plain_text", "text": "Units for metric 3"}
-                },
-                "label": {"type": "plain_text", "text": "Metric 3 Units"},
-                "optional": True
-            },
-            {
-                "type": "input",
-                "block_id": "metric3_optional",
-                "element": {
-                    "type": "checkboxes",
-                    "action_id": "optional_input",
-                    "options": [
-                        {
-                            "text": {"type": "plain_text", "text": "Make this metric optional"},
-                            "value": "optional"
-                        }
-                    ]
-                },
-                "label": {"type": "plain_text", "text": "Metric 3 Settings"},
-                "optional": True
-            }
-        ],
+        "private_metadata": json.dumps({
+            "name": category_name,
+            "icon": category_icon,
+            "channel_id": channel_id,
+            "metric_count": metric_count
+        }),
+        "blocks": blocks,
         "submit": {"type": "plain_text", "text": "Create Category"}
     }
 
@@ -439,6 +410,50 @@ def handle_interactions():
             )
             print(f"views.update response: {resp.status_code}", file=sys.stderr)
 
+        # Handle "Add another metric" button click
+        elif action_id == "add_another_metric":
+            current_metadata = json.loads(payload["view"].get("private_metadata", "{}"))
+            state_values = payload["view"]["state"]["values"]
+
+            # Extract current values to preserve them
+            existing_values = {}
+            metric_count = current_metadata.get("metric_count", 1)
+            for i in range(1, metric_count + 1):
+                if f"metric{i}_name" in state_values:
+                    val = state_values[f"metric{i}_name"]["name_input"].get("value")
+                    if val:
+                        existing_values[f"metric{i}_name"] = val
+                if f"metric{i}_units" in state_values:
+                    val = state_values[f"metric{i}_units"]["units_input"].get("value")
+                    if val:
+                        existing_values[f"metric{i}_units"] = val
+                if f"metric{i}_optional" in state_values:
+                    opts = state_values[f"metric{i}_optional"]["optional_input"].get("selected_options", [])
+                    if opts:
+                        existing_values[f"metric{i}_optional"] = True
+
+            # Build updated modal with one more metric field
+            updated_modal = build_add_metrics_modal(
+                category_name=current_metadata.get("name"),
+                category_icon=current_metadata.get("icon"),
+                channel_id=current_metadata.get("channel_id"),
+                metric_count=metric_count + 1,
+                existing_values=existing_values
+            )
+
+            resp = requests.post(
+                "https://slack.com/api/views.update",
+                headers={
+                    "Authorization": f"Bearer {BOT_TOKEN}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "view_id": payload["view"]["id"],
+                    "view": updated_modal
+                }
+            )
+            print(f"views.update response: {resp.status_code}", file=sys.stderr)
+
         return "", 200
 
     # Handle create category form submission (step 1 - name and icon)
@@ -456,12 +471,7 @@ def handle_interactions():
         category_icon = "📊"  # default icon
 
         # Show the add metrics modal, passing channel_id through
-        add_metrics_modal = build_add_metrics_modal(category_name, category_icon)
-        add_metrics_modal["private_metadata"] = json.dumps({
-            "name": category_name,
-            "icon": category_icon,
-            "channel_id": channel_id
-        })
+        add_metrics_modal = build_add_metrics_modal(category_name, category_icon, channel_id)
         return jsonify({
             "response_action": "update",
             "view": add_metrics_modal
@@ -476,27 +486,28 @@ def handle_interactions():
         category_name = category_info["name"]
         category_icon = category_info["icon"]
         channel_id = category_info.get("channel_id")
-        
+        metric_count = category_info.get("metric_count", 1)
+
         state_values = payload["view"]["state"]["values"]
-        
-        # Extract metrics
+
+        # Extract metrics (dynamic count based on how many were added)
         metrics = []
-        for i in range(1, 4):  # metrics 1, 2, 3
+        for i in range(1, metric_count + 1):
             name_key = f"metric{i}_name"
             units_key = f"metric{i}_units"
             optional_key = f"metric{i}_optional"
-            
+
             if name_key in state_values and state_values[name_key]["name_input"]["value"]:
                 metric_name = state_values[name_key]["name_input"]["value"].strip()
                 metric_units = ""
                 if units_key in state_values and state_values[units_key]["units_input"]["value"]:
                     metric_units = state_values[units_key]["units_input"]["value"].strip()
-                
+
                 # Check if metric is marked as optional
                 is_optional = False
                 if optional_key in state_values and state_values[optional_key]["optional_input"]["selected_options"]:
                     is_optional = True
-                
+
                 metrics.append({
                     "name": metric_name,
                     "units": metric_units or None,
