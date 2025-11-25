@@ -9,6 +9,7 @@ from database import (
 )
 from category_templates import setup_default_templates
 from google_sheets_sync import sync_metrics_to_sheets
+from slack_verification import require_slack_verification, get_signing_secret_status
 
 
 def sync_to_sheets_background(category_name, metric_entries, metric_date, user_display_name, notes,
@@ -36,6 +37,13 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 # Initialize database and templates on startup
 setup_default_templates()
+
+# Check signing secret configuration on startup
+signing_secret_status = get_signing_secret_status()
+if signing_secret_status["configured"]:
+    print(f"Slack signing secret configured ({signing_secret_status['length']} chars)", file=sys.stderr)
+else:
+    print("WARNING: Slack signing secret NOT configured - signature verification disabled!", file=sys.stderr)
 
 CSV_PATH = Path("data/metrics.csv")
 
@@ -241,6 +249,7 @@ def build_add_metrics_modal(category_name, category_icon, channel_id=None, metri
     }
 
 @app.post("/slack/commands")
+@require_slack_verification
 def handle_slash_command():
     trigger_id = request.form.get("trigger_id")
     user_id = request.form.get("user_id")
@@ -375,6 +384,7 @@ def build_metric_entry_modal(category_id: int, category_name: str, metric_defini
     }
 
 @app.post("/slack/interactions")
+@require_slack_verification
 def handle_interactions():
     payload_raw = request.form.get("payload")
     if not payload_raw:
