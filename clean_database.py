@@ -21,24 +21,19 @@ def clean_database():
         metrics_deleted = cursor.rowcount
         print(f"Deleted {metrics_deleted} logged metrics")
 
-        # Delete metric definitions for non-template categories
-        cursor.execute("""
-            DELETE FROM metric_definitions
-            WHERE category_id IN (
-                SELECT id FROM categories WHERE is_template = FALSE
-            )
-        """)
+        # Delete all metric definitions
+        cursor.execute("DELETE FROM metric_definitions")
         metric_defs_deleted = cursor.rowcount
-        print(f"Deleted {metric_defs_deleted} metric definitions for user categories")
+        print(f"Deleted {metric_defs_deleted} metric definitions")
 
-        # Delete non-template categories
-        cursor.execute("DELETE FROM categories WHERE is_template = FALSE")
+        # Delete all categories (including templates)
+        cursor.execute("DELETE FROM categories")
         categories_deleted = cursor.rowcount
-        print(f"Deleted {categories_deleted} user-created categories")
+        print(f"Deleted {categories_deleted} categories")
 
         conn.commit()
         print("\n✓ Database cleaned successfully!")
-        print("Templates preserved and ready for use.")
+        print("Starting with a completely fresh database.")
 
     except Exception as e:
         conn.rollback()
