@@ -149,16 +149,16 @@ def get_category_templates() -> List[Dict]:
         conn.close()
 
 def get_user_categories(user_id: str) -> List[Dict]:
-    """Get categories created by a specific user"""
+    """Get all workspace categories (not user-specific, despite legacy function name)"""
     conn = get_connection()
     cursor = conn.cursor()
-    
+
     try:
         cursor.execute("""
-            SELECT * FROM categories 
-            WHERE created_by_user_id = ? AND is_template = FALSE
+            SELECT * FROM categories
+            WHERE is_template = FALSE
             ORDER BY name
-        """, (user_id,))
+        """)
         
         categories = []
         for row in cursor.fetchall():

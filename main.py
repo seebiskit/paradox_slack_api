@@ -254,13 +254,19 @@ def handle_slash_command():
     trigger_id = request.form.get("trigger_id")
     user_id = request.form.get("user_id")
     channel_id = request.form.get("channel_id")
-    
+
     print(f"Slash command - Channel ID: {channel_id}", file=sys.stderr)
-    
-    # don't think I need to send user_id back now that I'm not create any custom categories for just one user
-    # will need to add back if we want to ever control access to certain datapoints (i.e., giving)
-    modal = build_category_selection_modal(user_id)
-    
+
+    # Check if there are any categories - if not, go straight to create category modal
+    user_categories = get_user_categories(user_id)
+
+    if not user_categories:
+        # No categories exist, show create category modal
+        modal = build_create_category_modal()
+    else:
+        # Categories exist, show selection modal
+        modal = build_category_selection_modal(user_id)
+
     # Store channel ID in modal metadata for later use
     modal["private_metadata"] = json.dumps({"channel_id": channel_id})
 
