@@ -318,8 +318,6 @@ def build_metric_entry_modal(category_id: int, category_name: str, metric_defini
         label_text = metric_def['name']
         if metric_def['units']:
             label_text += f" ({metric_def['units']})"
-        if not metric_def['is_required']:
-            label_text += " (optional)"
         
         placeholder_text = f"Enter {metric_def['name'].lower()}"
         if metric_def.get('min_value') is not None and metric_def.get('max_value') is not None:
